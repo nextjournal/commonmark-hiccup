@@ -38,6 +38,16 @@
 (declare text-content)
 
 (def default-config
+  "An options map.
+
+  The `:normalize` key may be a boolean indicating whether generated
+  Hiccup structures should be normalized. Normalization flattens lists
+  into tag nodes, and ensures the presence of an attributes map.
+
+  The `:render :nodes` key is a map from `org.commonmark.node.Node`
+  instance classes to specifications used to render that node class to
+  Hiccup. See `#'render-node` for an exhaustive discussion of
+  supported render specifications." 
   {;; Attempt normalization of hiccup structures?
    :normalize
    true
@@ -118,7 +128,8 @@
   (let [parent (.getParent node)
         tight? (and (instance? ListBlock parent)
                     (.isTight ^ListBlock parent))]
-    (assoc (property-map node) :content (if tight? :content-tight :content))))
+    (assoc (property-map node)
+           :content (if tight? :content-tight :content))))
 
 (defn- normalize-hiccup
   "Attempts to normalize a Hiccup style tag.
@@ -150,26 +161,35 @@
         
         :else e))
 
-(defn- render-node
+(defn- fix [f x]
+  (let [x' (f x)]
+    (if-not (= x x')
+      (recur f x')
+      x)))
+
+(defn render-node
   "Renders a single CommonMark document node to Hiccup structures, using
   the renderers specified in the configuration.
 
   If `:normalize` is truthy in the configuration, further attempts to
   normalize all produced nodes."
   [config node]
-  (let [xform-or-spec   (get-in config [:renderer :nodes (class node)])
-        render-children (fn [n] (map (partial render-node config) (children n)))]
-    (->> (cond (and (fn? xform-or-spec)
-                    (not (keyword? xform-or-spec)))
-               ,,(xform-or-spec node)
-
-               :else
-               ,,(walk/postwalk-replace (node-properties node) xform-or-spec))
-
-         ;; Recursively render
-         (walk/postwalk #(if (= :content %) (render-children node) %))
-         (walk/postwalk #(if (= :content-tight %) (render-children (first (children node))) %))
-         (walk/postwalk #(if (= :text-content %) (text-content node) %))
+  (let [spec             (get-in config [:renderer :nodes (class node)])
+        render-children  (fn [n] (map (partial render-node config) (children n)))
+        props            (node-properties node)
+        d-children       (delay (render-children node))
+        d-children-tight (delay (render-children (first (children node))))
+        d-text           (delay (text-content node))]
+    (->> spec
+         ;; Do the render
+         (walk/postwalk (partial fix
+                                 (comp #(cond (= :content %)       @d-children
+                                              (= :content-tight %) @d-children-tight
+                                              (= :text-content %)  @d-text 
+                                              :else                %)
+                                       #(get props % %)
+                                       #(if (and (fn? %) (not (keyword? %)))
+                                          (% node) %))))
          ;; Clean up the output some
          (#(if (:normalize config) (normalize-hiccup %) %)))))
 
