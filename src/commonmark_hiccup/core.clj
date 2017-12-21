@@ -93,8 +93,10 @@
 (defn markdown->hiccup
   "Takes a string of markdown and a renderer configuration and converts the string
   to a hiccup-compatible data structure."
-  [config s]
-  (render-node config (parse-markdown s)))
+  ([s]
+   (markdown->hiccup default-config s))
+  ([config s]
+   (render-node config (parse-markdown s))))
 
 (defn markdown->html
   "Takes a string of markdown and converts it to HTML. Optionally takes a configuration
