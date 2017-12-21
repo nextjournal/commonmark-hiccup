@@ -20,9 +20,9 @@
            "<p>This is a <a href=\"www.test.tst\">test</a>.</p>")))
   (testing "renders images"
     (are [md html] (= html (markdown->html md))
-      "![A pretty picture](./picture.png)" "<p><img alt=\"A pretty picture\" src=\"./picture.png\" /></p>"
+      "![A pretty picture](./picture.png)"             "<p><img alt=\"A pretty picture\" src=\"./picture.png\" /></p>"
       "![A pretty picture](./picture.png \"A Title\")" "<p><img alt=\"A pretty picture\" src=\"./picture.png\" title=\"A Title\" /></p>"
-      "![](./picture.png)" "<p><img alt=\"\" src=\"./picture.png\" /></p>"))
+      "![](./picture.png)"                             "<p><img alt=\"\" src=\"./picture.png\" /></p>"))
   (testing "renders fenced code blocks"
     (is (= (markdown->html "```\n(def foo \"bar\")\n```")
            "<pre><code>(def foo &quot;bar&quot;)\n</code></pre>"))
