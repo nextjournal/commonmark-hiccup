@@ -9,7 +9,9 @@
             [clojure.walk :as walk])
   (:import org.commonmark.parser.Parser
            [org.commonmark.node
+            ,,Node
             ,,Document
+            ,,Block
             ,,Heading
             ,,Paragraph
             ,,Text
@@ -31,6 +33,10 @@
             ,,SoftLineBreak
             ,,HardLineBreak]))
 
+(set! *warn-on-reflection* true)
+
+(declare text-content)
+
 (def default-config
   {;; Attempt normalization of hiccup structures?
    :normalize
@@ -41,7 +47,9 @@
    :renderer
    {:nodes
     {Document          :content
-     Heading           ['(:h :node-level) :content]
+     Heading           (fn [^Heading node]
+                         [(keyword (str "h" (.getLevel node)))
+                          (text-content node)])
      Paragraph         [:p :content]
      Text              :node-literal
      BulletList        [:ul :content]
@@ -51,7 +59,7 @@
      HtmlBlock         :node-literal
      HtmlInline        :node-literal
      FencedCodeBlock   [:pre [:code {:class :node-info} :node-literal]]
-     IndentedCodeBlock [:pre [:code :node-literal]]
+     IndentedCodeBlock [:pre [:code {} :node-literal]]
      Code              [:code :node-literal]
      Link              [:a {:href :node-destination} :content]
      Image             [:img {:src   :node-destination
@@ -65,18 +73,22 @@
 
 (defn- children
   "Returns a seq of the children of a commonmark-java AST node."
-  [node]
-  (take-while some? (iterate #(.getNext %) (.getFirstChild node))))
+  [^Node node]
+  (->> (.getFirstChild node)
+       (iterate #(.getNext ^Node %))
+       (take-while some?)))
 
 (defn- text-content
   "Recursively walks over the given commonmark-java AST node depth-first,
   extracting and concatenating literals from any text nodes it visits."
-  [node]
+  [^Block node]
   (->> (tree-seq (constantly true) children node)
-       (filter #(instance? Text %))
-       (map #(.getLiteral %))
+       (keep #(when (instance? Text %)
+                (.getLiteral ^Text %)))
        (apply str)))
 
+;; FIXME (arrdem 2017-12-21):
+;;   Good grief this is slow. Can almost certainly be replaced with something less naive.
 (defn property-map [node]
   (into {} (for [[k v] (dissoc (bean node) :class)]
              [(keyword (str "node-" (name k))) v])))
@@ -102,17 +114,11 @@
 (defmethod node-properties OrderedList [node]
   (update (property-map node) :node-startNumber #(when (< 1 %) %)))
 
-(defmethod node-properties ListItem [node]
+(defmethod node-properties ListItem [^ListItem node]
   (let [parent (.getParent node)
         tight? (and (instance? ListBlock parent)
-                    (.isTight parent))]
+                    (.isTight ^ListBlock parent))]
     (assoc (property-map node) :content (if tight? :content-tight :content))))
-
-(defn- fix-headings
-  "Takes a seq and joins its elements into a single string. If a keyword
-  is in the first position, its name is used instead of the keyword itself."
-  [s]
-  (if (and (list? s) (= :h (first s))) (keyword (str "h" (second s))) s))
 
 (defn- normalize-hiccup
   "Attempts to normalize a Hiccup style tag.
@@ -165,7 +171,6 @@
          (walk/postwalk #(if (= :content-tight %) (render-children (first (children node))) %))
          (walk/postwalk #(if (= :text-content %) (text-content node) %))
          ;; Clean up the output some
-         (walk/postwalk fix-headings)
          (#(if (:normalize config) (normalize-hiccup %) %)))))
 
 (defn ^Document parse-markdown
