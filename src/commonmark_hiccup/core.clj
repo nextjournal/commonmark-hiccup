@@ -53,17 +53,23 @@
   "Returns the map representation of a commonmark-java AST node. Property names
   are prefixed with \"node-\"."
   class)
+
 (defmethod node-properties :default [node] (property-map node))
+
 (defmethod node-properties org.commonmark.node.FencedCodeBlock [node]
   (-> (property-map node)
       (update :node-literal hiccup.util/escape-html)
       (update :node-info not-empty)))
+
 (defmethod node-properties org.commonmark.node.IndentedCodeBlock [node]
   (update (property-map node) :node-literal hiccup.util/escape-html))
+
 (defmethod node-properties org.commonmark.node.Code [node]
   (update (property-map node) :node-literal hiccup.util/escape-html))
+
 (defmethod node-properties org.commonmark.node.OrderedList [node]
   (update (property-map node) :node-startNumber #(when (< 1 %) %)))
+
 (defmethod node-properties org.commonmark.node.ListItem [node]
   (let [parent (.getParent node)
         tight? (and (instance? org.commonmark.node.ListBlock parent)
