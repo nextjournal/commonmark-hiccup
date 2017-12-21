@@ -28,9 +28,9 @@
            "<pre><code>(def foo &quot;bar&quot;)\n</code></pre>"))
     (is (= (markdown->html "```clojure\n(def foo \"bar\")\n```")
            "<pre><code class=\"clojure\">(def foo &quot;bar&quot;)\n</code></pre>"))
-    (let [config (update-in default-config
-                            [:renderer :nodes org.commonmark.node.FencedCodeBlock]
-                            (constantly [:pre {:class '("lang:" :node-info " decode:true")} :node-literal]))]
+    (let [config (assoc-in default-config
+                           [:renderer :nodes org.commonmark.node.FencedCodeBlock]
+                           [:pre {:class '("lang:" :node-info " decode:true")} :node-literal])]
       (is (= (markdown->html config "```clojure\n(def foo \"bar\")\n```")
              "<pre class=\"lang:clojure decode:true\">(def foo &quot;bar&quot;)\n</pre>"))))
   (testing "renders indented code blocks"
