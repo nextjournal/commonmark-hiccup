@@ -217,4 +217,3 @@
    (markdown->html default-config s))
   ([config s]
    (hiccup/html (markdown->hiccup config s))))
-
