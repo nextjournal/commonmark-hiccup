@@ -137,6 +137,9 @@
     (assoc (property-map node)
            :content (if tight? :content-tight :content))))
 
+(def self-closing?
+  #{:br :hr :img})
+
 (defn normalize-hiccup
   "Attempts to normalize a Hiccup style tag.
 
@@ -144,7 +147,8 @@
   Recursively flattens any lists in the tail.
   Recursively normalizes any tags."
   [e]
-  (cond (vector? e)
+  (cond (and (vector? e)
+             (not (self-closing? (first e))))
         (let [[tag & e]      e
               [attrs & tail] (if (map? (first e))
                                [(first e) (rest e)]
