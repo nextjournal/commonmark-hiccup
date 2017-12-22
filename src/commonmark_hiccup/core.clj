@@ -6,6 +6,7 @@
 
   The renderer itself is quite configurable."
   (:require [hiccup.core :as hiccup]
+            [hiccup.util :refer [escape-html]]
             [clojure.walk :as walk])
   (:import org.commonmark.parser.Parser
            [org.commonmark.node
@@ -47,7 +48,7 @@
   The `:render :nodes` key is a map from `org.commonmark.node.Node`
   instance classes to specifications used to render that node class to
   Hiccup. See `#'render-node` for an exhaustive discussion of
-  supported render specifications." 
+  supported render specifications."
   {;; Attempt normalization of hiccup structures?
    :normalize
    true
@@ -68,7 +69,12 @@
      BlockQuote        [:blockquote :content]
      HtmlBlock         :node-literal
      HtmlInline        :node-literal
-     FencedCodeBlock   [:pre [:code {:class :node-info} :node-literal]]
+     FencedCodeBlock   (fn [^FencedCodeBlock block]
+                         [:pre [:code
+                                (let [info (.getInfo block)]
+                                  (if-not (empty? info)
+                                    {:class info} {}))
+                                (escape-html (.getLiteral block))]])
      IndentedCodeBlock [:pre [:code {} :node-literal]]
      Code              [:code :node-literal]
      Link              [:a {:href :node-destination} :content]
@@ -81,14 +87,14 @@
      SoftLineBreak     " "
      HardLineBreak     [:br]}}})
 
-(defn- children
+(defn children
   "Returns a seq of the children of a commonmark-java AST node."
   [^Node node]
   (->> (.getFirstChild node)
        (iterate #(.getNext ^Node %))
        (take-while some?)))
 
-(defn- text-content
+(defn text-content
   "Recursively walks over the given commonmark-java AST node depth-first,
   extracting and concatenating literals from any text nodes it visits."
   [^Block node]
@@ -116,10 +122,10 @@
       (update :node-info not-empty)))
 
 (defmethod node-properties IndentedCodeBlock [node]
-  (update (property-map node) :node-literal hiccup.util/escape-html))
+  (update (property-map node) :node-literal escape-html))
 
 (defmethod node-properties Code [node]
-  (update (property-map node) :node-literal hiccup.util/escape-html))
+  (update (property-map node) :node-literal escape-html))
 
 (defmethod node-properties OrderedList [node]
   (update (property-map node) :node-startNumber #(when (< 1 %) %)))
@@ -131,7 +137,7 @@
     (assoc (property-map node)
            :content (if tight? :content-tight :content))))
 
-(defn- normalize-hiccup
+(defn normalize-hiccup
   "Attempts to normalize a Hiccup style tag.
 
   Ensures the presence of an attributes map.
@@ -148,20 +154,21 @@
                        (map (fn [[k v]]
                               [k (normalize-hiccup v)])
                             attrs))
-                 (mapcat (fn lflat [e] 
-                           (if-not (or (vector? e) (string? e))
-                             (mapcat lflat e)
-                             (if (vector? e)
-                               [(normalize-hiccup e)]
-                               [e])))
-                         tail)))
+                 (->> tail
+                      (mapcat (fn lflat [e]
+                                (if-not (or (vector? e) (string? e))
+                                  (mapcat lflat e)
+                                  (if (vector? e)
+                                    [(normalize-hiccup e)]
+                                    [e]))))
+                      (#(if (every? string? %) [(apply str %)] %)))))
         (and (seq? e)
              (every? string? e))
         (apply str e)
-        
+
         :else e))
 
-(defn- fix [f x]
+(defn fix [f x]
   (let [x' (f x)]
     (if-not (= x x')
       (recur f x')
@@ -185,7 +192,7 @@
          (walk/postwalk (partial fix
                                  (comp #(cond (= :content %)       @d-children
                                               (= :content-tight %) @d-children-tight
-                                              (= :text-content %)  @d-text 
+                                              (= :text-content %)  @d-text
                                               :else                %)
                                        #(get props % %)
                                        #(if (and (fn? %) (not (keyword? %)))
