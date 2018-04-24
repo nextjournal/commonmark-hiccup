@@ -116,6 +116,14 @@
 
 (defmethod node-properties :default [node] (property-map node))
 
+(defmethod node-properties HtmlBlock [node]
+  (let [base (property-map node)]
+    (assoc base :escaped-node-literal (escape-html (:node-literal base)))))
+
+(defmethod node-properties HtmlInline [node]
+  (let [base (property-map node)]
+    (assoc base :escaped-node-literal (escape-html (:node-literal base)))))
+
 (defmethod node-properties FencedCodeBlock [node]
   (-> (property-map node)
       (update :node-literal hiccup.util/escape-html)
