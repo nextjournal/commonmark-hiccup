@@ -6,7 +6,7 @@
 
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [com.atlassian.commonmark/commonmark "0.8.0"]
-                 [hiccup "1.0.5"]]
+                 [hiccup/hiccup "1.0.5"]]
 
   :plugins [[me.arrdem/lein-git-version "LATEST"]]
   :git-version {:status-to-version

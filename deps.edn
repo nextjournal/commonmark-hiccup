@@ -1,4 +1,4 @@
 {:paths ["src"]
  :deps {org.clojure/clojure {:mvn/version "1.9.0"}
         com.atlassian.commonmark/commonmark {:mvn/version "0.8.0"}
-        hiccup {:mvn/version "1.0.5"}}}
+        hiccup/hiccup {:mvn/version "1.0.5"}}}
